@@ -8,27 +8,15 @@ This is for contacting twitter, and watching a specific user or word
 
 """
 import logging
-# import signal
 import tweepy
 import time
 import os
-# import sys
 import datetime
 from threading import Thread
-import json
 import threading
-
 
 logger = logging.getLogger(__name__)
 exit_flag = False
-
-
-# def signal_handler(sig_num, frame):
-#     """Smooth exit from system"""
-#     global exit_flag
-#     logger.warning('Received exit signal number: {}'.format(str(sig_num)))
-#     if sig_num:
-#         exit_flag = True
 
 
 def _start(self, is_async):
@@ -57,12 +45,19 @@ class WatchTwitter(tweepy.StreamListener):
         auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
         auth.set_access_token(access_token, access_token_secret)
         self.api = tweepy.API(auth)
-        # logger.warning("Did a monkey patch, could use a demo on this")
         tweepy.Stream._start = _start
         self.subscriptions = []
         self._stop_event = threading.Event()
         self.stream_timestamp = 0
         self.master_timestamp = 0
+        self.register = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.stream.running:
+            self.stream.running = False
 
     def add_subscription(self, subscribe_to):
         """If stream is running adds new subscription, restarts stream"""
@@ -99,20 +94,16 @@ class WatchTwitter(tweepy.StreamListener):
         self.subscriptions.append(string)
         self.start_stream()
 
-    def exit_flag_toggle(self):
-        global exit_flag
-        if exit_flag:
-            self.pause_stream()
-
     def start_stream(self):
         global exit_flag
         exit_flag = False
         logger.info('Subscriptions: {}'.format(self.subscriptions))
         self.stream = tweepy.Stream(auth=self.api.auth, listener=self)
-        time.sleep(1)
         self.stream.filter(track=self.subscriptions, is_async=True)
 
     def on_status(self, status):
+        # need a stream handler, if not none run the stream handler and
+        # send the status to slack, else return not exit flag
         logger.info(status.text)
 
     def on_connect(self):
@@ -121,17 +112,6 @@ class WatchTwitter(tweepy.StreamListener):
             datetime.datetime.now()))
         if not self.master_timestamp:
             self.master_timestamp = self.stream_timestamp
-
-    def get_user_timeline(self, users_name):
-        return self.api.user_timeline(screen_name=users_name, count=1)
-
-    def most_recent_tweet(self, users_name):
-        logger.info('subscriptions:')
-        user = self.get_user_timeline(users_name)
-        status = user[0]._json
-        json_str = json.dumps(status)
-        json_dict = json.loads(json_str)
-        logger.info('{} tweeted: {}'.format(users_name, json_dict['text']))
 
 
 def log_config():
@@ -157,16 +137,11 @@ def init_logger():
 
     logger.setLevel(logging.DEBUG)
 
-    # signal.signal(signal.SIGINT, signal_handler)
-    # signal.signal(signal.SIGTERM, signal_handler)
-
 
 def main():
     global exit_flag
     log_config()
     log_set_level()
-    # signal.signal(signal.SIGINT, signal_handler)
-    # signal.signal(signal.SIGTERM, signal_handler)
 
     tb = WatchTwitter()
     tb.init_stream('python')

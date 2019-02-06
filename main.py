@@ -31,22 +31,20 @@ def init_logger():
 
 def main():
     global exit_flag
-    init_logger()
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     twitbot.init_logger()
-    tb = twitbot.WatchTwitter()
-    # tb.self
-    tb.init_stream('python')
+    twitterbot = twitbot.WatchTwitter()
+
     while not exit_flag:
-        # logger.info("hello me")
-        time.sleep(3)
-        tb.pause_stream()
-        time.sleep(3)
-        tb.add_subscription('Trump')
-        time.sleep(2)
-    #     tb.remove_subscription('Trump')
-    # tb.pause_stream()
+        with twitterbot as tb:
+            tb.init_stream('python')
+            # logger.info("hello me")
+            time.sleep(3)
+            tb.pause_stream()
+            time.sleep(3)
+            tb.add_subscription('Trump')
+            time.sleep(2)
 
 
 if __name__ == "__main__":
